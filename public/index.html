@@ -1,38 +1,135 @@
-<html style='color: #2a2a2a'>
-  <body style='width: 500px; margin: 30px auto auto auto'>
-    <h1>CS 4145: Temperature Converter</h1>
-    <div style='margin: auto; width: 150px'>
-      <input type='number' id='value-input' style='width: 50px'></input>
-      <select id='unit-input' style='width: 90px'>
-        <option value='celcius'>Celcius</option>
-        <option value='farenheit'>Farenheit</option>
-      </select>
+<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="app.css">
+  </head>
+  <body>
+    <div class='header'>
+      <h1>CS 4145: Cloudinary UI</h1>
+      <form id="img-upload-form" enctype="multipart/form-data" style="margin-bottom: 50px">
+        <input type="text" name='url-img-upload' placeholder="Web URL">
+        <span> or </span>
+        <input type="file" name='img-upload'>
+        <input type="submit" value="Upload To Cloudinary" id="img-upload-button">
+        <span class="uploader">Uploading...</span>
+      </form>
     </div>
-    <button style='display: block; margin-top: 10px; height: 30px; width: 100%' id='convert-button'>CONVERT</button>
-    <div id='conversion-result' style='margin-top: 20px; text-align: center; font-size: 20px'></div>
+    <div class="img-list"/>
+    <div class="loader">Loading...</div>
   </body>
 
   <script src="https://code.jquery.com/jquery-3.1.1.min.js" integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8=" crossorigin="anonymous"></script>
   <script>
     $(document).ready(function() {
-      $('#convert-button').click(function() {
-        var value = $('#value-input').val();
-        var unit = $('#unit-input').val();
+      var cloud_url = "https://res.cloudinary.com/dhdze0irb/image/upload/";
+      $('.uploader').hide();
+
+      function update_list() {
+        $('.img-list').empty();
+        $('.loader').show();
         $.ajax({
-          type: "POST",
-          url: "http://localhost:8081",
-          data: JSON.stringify({ 'unit':unit, 'value': parseFloat(value) }),
-          contentType: "application/json; charset=utf-8",
-          dataType: "json",
+          type: "GET",
+          url: '/list',
           success: function(data){
-            $('#conversion-result').text(data.value + " " + data.unit);
+            $('.loader').hide();
+            for (i in data.resources) {
+              let img = data.resources[i];
+              cont = '<div class="img-entry rippleJS">';
+              cont += '<button class="delete-btn" id="delete-' + img.public_id + '"/>';
+              cont += '<button class="download-btn" id="download-' + img.public_id + '"><a href="' + cloud_url + img.public_id + '" target="_blank"></a></button>';
+              cont += '<img src="' + cloud_url + 'h_150/' + img.public_id + '"/>'
+              cont += '</div>'
+              $('.img-list').append(cont);
+            }
           },
           error: function(err){
-            $('#conversion-result').text("ERROR: " + err.status + " - " + err.statusText);
+            alert(JSON.stringify(err));
+          }
+        });
+      }
+
+      update_list();
+
+      $(document).on('click', '.delete-btn', function(e) {
+        e.preventDefault();
+        var id = $(e.target).attr('id');
+        id = id.substr(7,id.length);
+        $.ajax({
+          type: "POST",
+          url: '/delete',
+          data: JSON.stringify({ 'img': id }),
+          contentType: "application/json; charset=utf-8",
+          dataType: "json",
+          success: function(data) {
+            update_list();
+          },
+          error: function(err) {
+            alert(JSON.stringify(err));
+            update_list();
           }
         });
       });
+
+      var file;
+      var fileURL;
+
+      $('input[type=file]').on('change', function (e) {
+        file = e.target.files[0];
+        if (files.length != 0) {
+          $('input[type=text]').attr('disabled',true);
+        } else {
+          $('input[type=text]').attr('disabled',false);
+        }
+      });
+
+      $('input[type=text]').on('change', function (e) {
+        fileURL = e.target.value;
+        if (fileURL != '') {
+          $('input[type=file]').attr('disabled',true);
+        } else {
+          $('input[type=file]').attr('disabled',false);
+        }
+      });
+
+      $('#img-upload-form').on('submit', function(e) {
+        e.preventDefault();
+        $('.uploader').show();
+        if (file != undefined && file.length != 0) {
+          var data = new FormData();
+          data.append('file0', file);
+          $.ajax({
+            type: "POST",
+            url: '/upload',
+            cache: false,
+            data: data,
+            processData: false, // Don't process the files
+            contentType: false,
+            success: function(data){
+              update_list();
+              $('.uploader').hide();
+            },
+            error: function(err){
+              alert(JSON.stringify(err));
+              update_list();
+            }
+          });
+        } else {
+          $.ajax({
+            type: "POST",
+            url: '/upload_url',
+            data: JSON.stringify({ 'imageURL': fileURL }),
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: function(data) {
+              update_list();
+              $('.uploader').hide();
+            },
+            error: function(err) {
+              alert(JSON.stringify(err));
+              update_list();
+            }
+          });
+        }
+      });
     });
   </script>
-
 </html>
